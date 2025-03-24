@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 from edcpy.edc_api import ConnectorController
 from edcpy.messaging import HttpPullMessage, with_messaging_app
 
-_COUNTERPARTY_PROTOCOL_URL = "http://edc:11003/api/dsp"
-_COUNTERPARTY_CONNECTOR_ID = "my-edc"
+_COUNTERPARTY_PROTOCOL_URL = "http://provider/api/dsp"
+_COUNTERPARTY_CONNECTOR_ID = "provider"
 _COUNTERPARTY_ASSET = "my-asset"
 
 # Load environment variables from .env.example-script file located in the same directory

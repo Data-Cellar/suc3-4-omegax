@@ -1,163 +1,156 @@
-# https://github.com/sovity/edc-ce/blob/v10.5.1/docker-compose.yaml
-version: "3.8"
+# https://github.com/sovity/edc-ce/blob/v11.0.0/docs/deployment-guide/goals/local-demo-ce/docker-compose.yaml
 services:
-  edc-ui:
-    image: ${EDC_UI_IMAGE}
+  consumer:
+    image: "caddy:2.8"
+    restart: "always"
     ports:
-      - "11000:8080"
-      - "11015:5005"
-    environment:
-      EDC_UI_ACTIVE_PROFILE: ${EDC_UI_ACTIVE_PROFILE}
-      EDC_UI_CONFIG_URL: edc-ui-config
-      EDC_UI_MANAGEMENT_API_URL: http://localhost:11002/api/management
-      EDC_UI_MANAGEMENT_API_KEY: ApiKeyDefaultValue
-      EDC_UI_CATALOG_URLS: http://edc2:11003/api/dsp
-      EDC_UI_MANAGEMENT_API_URL_SHOWN_IN_DASHBOARD: http://localhost:11002/control/api/management
-      NGINX_ACCESS_LOG: off
-    networks:
-      - omegax_datacellar_net
-
-  edc:
-    image: ${EDC_IMAGE}
-    depends_on:
-      postgresql:
-        condition: service_healthy
-    environment:
-      MY_EDC_PARTICIPANT_ID: "my-edc"
-      MY_EDC_TITLE: "EDC Connector"
-      MY_EDC_DESCRIPTION: "sovity Community Edition EDC Connector"
-      MY_EDC_CURATOR_URL: "https://example.com"
-      MY_EDC_CURATOR_NAME: "Example GmbH"
-      MY_EDC_MAINTAINER_URL: "https://sovity.de"
-      MY_EDC_MAINTAINER_NAME: "sovity GmbH"
-
-      MY_EDC_FQDN: "edc"
-      EDC_API_AUTH_KEY: ApiKeyDefaultValue
-
-      MY_EDC_JDBC_URL: jdbc:postgresql://postgresql:5432/edc
-      MY_EDC_JDBC_USER: edc
-      MY_EDC_JDBC_PASSWORD: edc
-
-      # docker compose local dev environment overrides (don't use with non-dev images)
-      MY_EDC_PROTOCOL: "http://"
-      EDC_DSP_CALLBACK_ADDRESS: http://edc:11003/api/dsp
-      EDC_WEB_REST_CORS_ENABLED: "true"
-      EDC_WEB_REST_CORS_HEADERS: "origin,content-type,accept,authorization,X-Api-Key"
-      EDC_WEB_REST_CORS_ORIGINS: "*"
-      EDC_AGENT_IDENTITY_KEY: "client_id" # required for Mock IAM to work
-
-    ports:
-      - "11001:11001"
-      - "11002:11002"
-      - "11003:11003"
-      - "11004:11004"
-      - "11005:5005"
-    networks:
-      - omegax_datacellar_net
-
-  edc-ui2:
-    image: ${EDC_UI_IMAGE}
-    ports:
-      - "22000:8080"
-    environment:
-      EDC_UI_ACTIVE_PROFILE: ${EDC_UI_ACTIVE_PROFILE}
-      EDC_UI_CONFIG_URL: edc-ui-config
-      EDC_UI_MANAGEMENT_API_URL: http://localhost:22002/api/management
-      EDC_UI_MANAGEMENT_API_KEY: ApiKeyDefaultValue
-      EDC_UI_CATALOG_URLS: http://edc:11003/api/dsp
-      NGINX_ACCESS_LOG: off
-    networks:
-      - omegax_datacellar_net
-
-  edc2:
-    image: ${EDC_IMAGE}
-    depends_on:
-      postgresql2:
-        condition: service_healthy
-    environment:
-      MY_EDC_PARTICIPANT_ID: "my-edc2"
-      MY_EDC_TITLE: "EDC Connector 2"
-      MY_EDC_DESCRIPTION: "sovity Community Edition EDC Connector"
-      MY_EDC_CURATOR_URL: "https://example.com"
-      MY_EDC_CURATOR_NAME: "Example GmbH"
-      MY_EDC_MAINTAINER_URL: "https://sovity.de"
-      MY_EDC_MAINTAINER_NAME: "sovity GmbH"
-
-      MY_EDC_FQDN: "edc2"
-      EDC_API_AUTH_KEY: ApiKeyDefaultValue
-
-      MY_EDC_JDBC_URL: jdbc:postgresql://postgresql2:5432/edc
-      MY_EDC_JDBC_USER: edc
-      MY_EDC_JDBC_PASSWORD: edc
-
-      # docker compose local dev environment overrides (don't use with non-dev images)
-      MY_EDC_PROTOCOL: "http://"
-      EDC_DSP_CALLBACK_ADDRESS: http://edc2:11003/api/dsp
-      EDC_WEB_REST_CORS_ENABLED: "true"
-      EDC_WEB_REST_CORS_HEADERS: "origin,content-type,accept,authorization,X-Api-Key"
-      EDC_WEB_REST_CORS_ORIGINS: "*"
-      EDC_AGENT_IDENTITY_KEY: "client_id" # required for Mock IAM to work
-
-    ports:
-      - "22001:11001"
-      - "22002:11002"
-      - "22003:11003"
-      - "22004:11004"
-      - "22005:5005"
-    networks:
-      - omegax_datacellar_net
-
-  test-backend:
-    image: ${TEST_BACKEND_IMAGE}
-    ports:
-      - "33001:11001"
-    networks:
-      - omegax_datacellar_net
-
-  postgresql:
-    image: docker.io/bitnami/postgresql:15
-    restart: always
-    environment:
-      POSTGRESQL_USERNAME: edc
-      POSTGRESQL_PASSWORD: edc
-      POSTGRESQL_DATABASE: edc
-    ports:
-      - "54321:5432"
+      - "22000:80"
     volumes:
-      - "postgresql:/bitnami/postgresql"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edc"]
-      interval: 1s
-      timeout: 5s
-      retries: 10
-    networks:
-      - omegax_datacellar_net
-
-  postgresql2:
-    image: docker.io/bitnami/postgresql:15
-    restart: always
+      - "./caddyfiles/Caddyfile.cp-with-integrated-dp:/etc/caddy/Caddyfile"
     environment:
-      POSTGRESQL_USERNAME: edc
-      POSTGRESQL_PASSWORD: edc
-      POSTGRESQL_DATABASE: edc
-    ports:
-      - "54322:5432"
-    volumes:
-      - "postgresql2:/bitnami/postgresql"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edc"]
-      interval: 1s
-      timeout: 5s
-      retries: 10
+      CONNECTOR_UPSTREAM_HOST: "consumer-connector"
+      FRONTEND_UPSTREAM_HOST: "consumer-ui"
     networks:
       - omegax_datacellar_net
-
+  consumer-ui:
+    image: "ghcr.io/sovity/edc-ce-ui:11.0.0"
+    restart: "always"
+    environment:
+      EDC_UI_MANAGEMENT_API_URL: "/api/management"
+      EDC_UI_MANAGEMENT_API_KEY: "SomeOtherApiKey"
+      EDC_UI_CONFIG_URL: "edc-ui-config"
+      NGINX_ACCESS_LOG: "off"
+    networks:
+      - omegax_datacellar_net
+  consumer-connector:
+    image: "ghcr.io/sovity/edc-ce:11.0.0"
+    restart: "always"
+    depends_on:
+      consumer-connector-db:
+        condition: "service_healthy"
+    environment:
+      sovity.deployment.kind: "control-plane-with-integrated-data-plane"
+      sovity.edc.fqdn.public: "consumer"
+      sovity.edc.fqdn.internal: "localhost"
+      sovity.jdbc.url: "jdbc:postgresql://consumer-connector-db:5432/db-name"
+      sovity.jdbc.user: "db-user"
+      sovity.jdbc.password: "db-pass"
+      edc.ui.active.profile: "sovity-open-source"
+      edc.ui.logout.url: "https://example.com"
+      edc.ui.catalog.urls: "http://provider/api/dsp"
+      sovity.management.api.iam.kind: "management-iam-api-key"
+      edc.api.auth.key: "SomeOtherApiKey"
+      sovity.edc.title: "consumer Title"
+      sovity.edc.description: "consumer Description"
+      sovity.edc.maintainer.name: "consumer Maintainer"
+      sovity.edc.maintainer.url: "https://consumer/maintainer"
+      sovity.edc.curator.name: "consumer Curator"
+      sovity.edc.curator.url: "https://consumer/curator"
+      sovity.dataspace.kind: "sovity-mock-iam"
+      edc.participant.id: "consumer"
+      sovity.http.protocol: "http://"
+      sovity.print.config: "true"
+      sovity.logging.level: "DEBUG"
+      sovity.logging.kind: "console"
+      sovity.micrometer.enabled: "true"
+    networks:
+      - omegax_datacellar_net
+  consumer-connector-db:
+    image: "docker.io/postgres:16-alpine"
+    restart: "always"
+    environment:
+      POSTGRES_USER: "db-user"
+      POSTGRES_PASSWORD: "db-pass"
+      POSTGRES_DB: "db-name"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U db-user --dbname=db-name"
+      interval: "1s"
+      timeout: "5s"
+      retries: 10
+    volumes:
+      - "consumer-connector-db-data:/var/lib/postgresql/data"
+    networks:
+      - omegax_datacellar_net
+  provider:
+    image: "caddy:2.8"
+    restart: "always"
+    ports:
+      - "11000:80"
+    volumes:
+      - "./caddyfiles/Caddyfile.cp-with-integrated-dp:/etc/caddy/Caddyfile"
+    environment:
+      CONNECTOR_UPSTREAM_HOST: "provider-connector"
+      FRONTEND_UPSTREAM_HOST: "provider-ui"
+    networks:
+      - omegax_datacellar_net
+  provider-ui:
+    image: "ghcr.io/sovity/edc-ce-ui:11.0.0"
+    restart: "always"
+    environment:
+      EDC_UI_MANAGEMENT_API_URL: "/api/management"
+      EDC_UI_MANAGEMENT_API_KEY: "SomeOtherApiKey"
+      EDC_UI_CONFIG_URL: "edc-ui-config"
+      NGINX_ACCESS_LOG: "off"
+    networks:
+      - omegax_datacellar_net
+  provider-connector:
+    image: "ghcr.io/sovity/edc-ce:11.0.0"
+    restart: "always"
+    depends_on:
+      provider-connector-db:
+        condition: "service_healthy"
+    environment:
+      sovity.deployment.kind: "control-plane-with-integrated-data-plane"
+      sovity.edc.fqdn.public: "provider"
+      sovity.edc.fqdn.internal: "localhost"
+      sovity.jdbc.url: "jdbc:postgresql://provider-connector-db:5432/db-name"
+      sovity.jdbc.user: "db-user"
+      sovity.jdbc.password: "db-pass"
+      edc.ui.active.profile: "sovity-open-source"
+      edc.ui.logout.url: "https://example.com"
+      edc.ui.catalog.urls: "http://consumer/api/dsp"
+      sovity.management.api.iam.kind: "management-iam-api-key"
+      edc.api.auth.key: "SomeOtherApiKey"
+      sovity.edc.title: "provider Title"
+      sovity.edc.description: "provider Description"
+      sovity.edc.maintainer.name: "provider Maintainer"
+      sovity.edc.maintainer.url: "https://provider/maintainer"
+      sovity.edc.curator.name: "provider Curator"
+      sovity.edc.curator.url: "https://provider/curator"
+      sovity.dataspace.kind: "sovity-mock-iam"
+      edc.participant.id: "provider"
+      sovity.http.protocol: "http://"
+      sovity.print.config: "true"
+      sovity.logging.level: "DEBUG"
+      sovity.logging.kind: "console"
+      sovity.micrometer.enabled: "true"
+    networks:
+      - omegax_datacellar_net
+  provider-connector-db:
+    image: "docker.io/postgres:16-alpine"
+    restart: "always"
+    environment:
+      POSTGRES_USER: "db-user"
+      POSTGRES_PASSWORD: "db-pass"
+      POSTGRES_DB: "db-name"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U db-user --dbname=db-name"
+      interval: "1s"
+      timeout: "5s"
+      retries: 10
+    volumes:
+      - "provider-connector-db-data:/var/lib/postgresql/data"
+    networks:
+      - omegax_datacellar_net
 volumes:
-  postgresql:
-    driver: local
-  postgresql2:
-    driver: local
-
+  consumer-connector-db-data:
+    driver: "local"
+  provider-connector-db-data:
+    driver: "local"
 networks:
   omegax_datacellar_net:
     external: true

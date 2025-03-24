@@ -31,7 +31,6 @@ tasks:
       - >
         docker compose
         -p {{.COMPOSE_PROJECT_NAME_OMEGAX}}
-        --env-file {{.ROOT_DIR}}/.env.sovity
         -f {{.ROOT_DIR}}/docker-compose-sovity.yml
         up -d --wait
 
@@ -41,7 +40,6 @@ tasks:
       - >
         docker compose
         -p {{.COMPOSE_PROJECT_NAME_OMEGAX}}
-        --env-file {{.ROOT_DIR}}/.env.sovity
         -f {{.ROOT_DIR}}/docker-compose-sovity.yml  
         down -v
 
