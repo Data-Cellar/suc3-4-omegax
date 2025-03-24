@@ -1,0 +1,106 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  NETWORK_NAME: omegax-datacellar-net
+  CERT_FOLDER: "{{.ROOT_DIR}}/certs"
+  COMPOSE_PROJECT_NAME_OMEGAX: omegax-env
+  COMPOSE_PROJECT_NAME_DATACELLAR: datacellar-env
+  SCRIPT_IMAGE: omegax-datacellar-scripts
+
+env:
+  NETWORK_NAME: "{{.NETWORK_NAME}}"
+  CERT_FOLDER: "{{.CERT_FOLDER}}"
+
+tasks:
+  create-network:
+    desc: "Create the local Docker network for the Sovity EDC connector"
+    cmds:
+      - docker network create --driver bridge {{.NETWORK_NAME}}
+    status:
+      - docker network inspect {{.NETWORK_NAME}} >/dev/null 2>&1
+
+  # For further information see:
+  # https://github.com/sovity/edc-ce/blob/v10.5.1/docs/deployment-guide/goals/local-demo/README.md
+  deploy-sovity:
+    deps:
+      - create-network
+    desc: "Deploy the local demo environment for the Sovity EDC connector"
+    cmds:
+      - >
+        docker compose
+        -p {{.COMPOSE_PROJECT_NAME_OMEGAX}}
+        --env-file {{.ROOT_DIR}}/.env.sovity
+        -f {{.ROOT_DIR}}/docker-compose-sovity.yml
+        up -d --wait
+
+  stop-sovity:
+    desc: "Stop the local demo environment for the Sovity EDC connector"
+    cmds:
+      - >
+        docker compose
+        -p {{.COMPOSE_PROJECT_NAME_OMEGAX}}
+        --env-file {{.ROOT_DIR}}/.env.sovity
+        -f {{.ROOT_DIR}}/docker-compose-sovity.yml  
+        down -v
+
+  datacellar-certs:
+    desc: Generates certificates and keystore for the Data Cellar connector
+    env:
+      OUT_DIR: "{{.CERT_FOLDER}}"
+      KEY_ALIAS: datacellar
+      KEY_PASSW: datacellar
+    cmds:
+      - mkdir -p {{.CERT_FOLDER}}
+      - "{{.ROOT_DIR}}/create-certs.sh"
+    status:
+      - test -f {{.CERT_FOLDER}}/*.pfx
+
+  deploy-datacellar:
+    deps:
+      - create-network
+      - datacellar-certs
+    desc: Deploy the local demo environment for the Data Cellar connector
+    cmds:
+      - >
+        docker compose
+        -p {{.COMPOSE_PROJECT_NAME_DATACELLAR}}
+        -f {{.ROOT_DIR}}/docker-compose-datacellar.yml
+        up -d --wait
+
+  stop-datacellar:
+    desc: Stop the local demo environment for the Data Cellar connector
+    cmds:
+      - >
+        docker compose
+        -p {{.COMPOSE_PROJECT_NAME_DATACELLAR}}
+        -f {{.ROOT_DIR}}/docker-compose-datacellar.yml
+        down -v
+
+  build-script-image:
+    desc: Build the script image
+    cmds:
+      - docker build -t {{.SCRIPT_IMAGE}} -f {{.ROOT_DIR}}/Dockerfile.scripts {{.ROOT_DIR}}
+
+  run-script:
+    deps:
+      - build-script-image
+    desc: "Run the script"
+    cmds:
+      - >
+        docker run --rm -it
+        -v {{.ROOT_DIR}}/script:/script
+        --network {{.NETWORK_NAME}}
+        {{.SCRIPT_IMAGE}}
+        python /script/run.py
+
+  clean:
+    desc: "Clean up the local demo environment for the Sovity EDC connector"
+    cmds:
+      - cmd: docker network rm {{.NETWORK_NAME}}
+        ignore_error: true
+      - task: stop-sovity
+      - task: stop-datacellar
+      - cmd: rm -fr {{.CERT_FOLDER}}
+        ignore_error: true

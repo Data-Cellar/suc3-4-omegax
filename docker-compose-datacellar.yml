@@ -1,0 +1,61 @@
+services:
+  datacellar-connector:
+    image: agmangas/edc-connector:main
+    platform: linux/amd64
+    restart: on-failure
+    environment:
+      PROPERTIES_FILE_PATH: /etc/connector/connector.properties
+      KEYSTORE_PATH: /etc/connector/certs/cert.pfx
+      KEYSTORE_PASSWORD: datacellar
+      API_AUTH_KEY: datacellar
+    ports:
+      - 44001:44001
+      - 44002:44002
+      - 44003:44003
+      - 44004:44004
+      - 44005:44005
+    volumes:
+      - ./datacellar-connector.properties:/etc/connector/connector.properties
+      - ${CERT_FOLDER}:/etc/connector/certs
+    depends_on:
+      datacellar-broker:
+        condition: service_healthy
+    networks:
+      - omegax_datacellar_net
+  datacellar-connector-backend:
+    image: agmangas/edc-connector:main
+    platform: linux/amd64
+    restart: on-failure
+    volumes:
+      - ${CERT_FOLDER}:/etc/connector/certs
+    environment:
+      EDC_RABBIT_URL: amqp://guest:guest@datacellar-broker:5672
+      EDC_HTTP_API_PORT: 44080
+    ports:
+      - 44080:44080
+    command: [run-http-backend]
+    depends_on:
+      datacellar-broker:
+        condition: service_healthy
+    networks:
+      - omegax_datacellar_net
+  datacellar-broker:
+    image: rabbitmq:3.11-management
+    restart: on-failure
+    ports:
+      - 45672:5672
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - omegax_datacellar_net
+networks:
+  omegax_datacellar_net:
+    external: true
+    name: ${NETWORK_NAME}
