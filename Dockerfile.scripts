@@ -1,3 +1,8 @@
 FROM python:3.11
 COPY script/requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
+RUN pip install poetry
+COPY edcpy /opt/edcpy
+WORKDIR /opt/edcpy
+RUN poetry build
+RUN pip install dist/edcpy-*.whl

@@ -11,7 +11,7 @@ from edcpy.messaging import HttpPullMessage, with_messaging_app
 
 _COUNTERPARTY_PROTOCOL_URL = "http://edc:11003/api/dsp"
 _COUNTERPARTY_CONNECTOR_ID = "my-edc"
-_COUNTERPARTY_ASSET = "GET-consumption"
+_COUNTERPARTY_ASSET = "my-asset"
 
 # Load environment variables from .env.example-script file located in the same directory
 # as this script. These variables configure the EDC connector connection details like
