@@ -78,6 +78,7 @@ tasks:
   deploy-sovity:
     deps:
       - create-network
+      - sovity-certs
     desc: "Deploy the local demo environment for the Sovity EDC connector"
     cmds:
       - >
@@ -118,6 +119,12 @@ tasks:
         -p {{.COMPOSE_PROJECT_NAME_DATACELLAR}}
         -f {{.ROOT_DIR}}/docker-compose-datacellar.yml
         down -v
+
+  deploy:
+    desc: Deploy the local demo environment for both connectors
+    cmds:
+      - task: deploy-sovity
+      - task: deploy-datacellar
 
   build-script-image:
     desc: Build the script image
