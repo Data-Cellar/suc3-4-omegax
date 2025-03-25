@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import pprint
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 import coloredlogs
 import jwt
@@ -10,8 +10,8 @@ import uvicorn
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
-from fastapi import Depends, FastAPI
-from pydantic import BaseModel  # pylint: disable=no-name-in-module
+from fastapi import Depends, FastAPI, Request
+from pydantic import BaseModel
 from slugify import slugify
 from typing_extensions import Annotated
 
@@ -185,9 +185,16 @@ async def http_push_endpoint(body: dict, messaging_app: MessagingAppDep):
 
 
 @app.post("/push/{routing_key_parts:path}")
-async def http_push_endpoint(
-    body: dict, messaging_app: MessagingAppDep, routing_key_parts: str = ""
-):  # pylint: disable=function-redefined
+async def http_push_endpoint_with_routing_key(
+    request: Request, messaging_app: MessagingAppDep, routing_key_parts: str = ""
+):
+    body_bytes = await request.body()
+
+    try:
+        body = await request.json()
+    except:
+        body = body_bytes.decode()
+
     parts = [item for item in routing_key_parts.split("/") if item]
     routing_key_suffix = "." + ".".join(parts) if len(parts) > 0 else ""
     routing_key = BASE_HTTP_PUSH_QUEUE_ROUTING_KEY + routing_key_suffix

@@ -109,7 +109,7 @@ tasks:
         docker compose
         -p {{.COMPOSE_PROJECT_NAME_DATACELLAR}}
         -f {{.ROOT_DIR}}/docker-compose-datacellar.yml
-        up -d --wait
+        up -d --build --wait
 
   stop-datacellar:
     desc: Stop the local demo environment for the Data Cellar connector

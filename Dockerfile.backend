@@ -1,0 +1,9 @@
+FROM python:3.11
+ENV POETRY_VERSION=2.1.1
+RUN pip install poetry==${POETRY_VERSION}
+COPY edcpy /opt/edcpy
+WORKDIR /opt/edcpy
+RUN /usr/local/bin/poetry install
+RUN /usr/local/bin/poetry build
+RUN pip install -U dist/*.whl
+CMD ["run-http-backend"]

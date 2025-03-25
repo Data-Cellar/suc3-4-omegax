@@ -4,14 +4,22 @@ import os
 import pprint
 
 import coloredlogs
-import httpx
 from dotenv import load_dotenv
-from edcpy.edc_api import ConnectorController
-from edcpy.messaging import HttpPullMessage, with_messaging_app
 
+from edcpy.edc_api import ConnectorController
+from edcpy.messaging import HttpPushMessage, with_messaging_app
+
+# URL of the provider's DSP API endpoint
 _COUNTERPARTY_PROTOCOL_URL = "http://provider/api/dsp"
+# Unique identifier of the provider connector
 _COUNTERPARTY_CONNECTOR_ID = "provider"
+# Asset ID to request from the provider
 _COUNTERPARTY_ASSET = "my-asset"
+
+# Configuration for the consumer backend that receives data from the provider
+_CONSUMER_BACKEND_BASE_URL = "http://datacellar-connector-backend:44080"
+_CONSUMER_BACKEND_PUSH_PATH = "/push"
+_CONSUMER_BACKEND_PUSH_METHOD = "POST"
 
 # Load environment variables from .env.example-script file located in the same directory
 # as this script. These variables configure the EDC connector connection details like
@@ -22,13 +30,16 @@ load_dotenv(os.path.join(_SCRIPT_DIR, ".env.script"))
 _logger = logging.getLogger(__name__)
 
 
-async def pull_handler(message: dict, queue: asyncio.Queue):
-    """Put an HTTP Pull message received from the Rabbit broker into a queue."""
+async def push_handler(message: dict, queue: asyncio.Queue):
+    """
+    Handler for push messages received from the provider.
+    Converts the raw message dict to a HttpPushMessage and puts it in the queue.
+    """
 
-    message = HttpPullMessage(**message)
+    message = HttpPushMessage(**message)
 
     _logger.info(
-        "Putting HTTP Pull request into the queue:\n%s", pprint.pformat(message.dict())
+        "Putting HTTP Push request into the queue:\n%s", pprint.pformat(message.dict())
     )
 
     # Using a queue is not strictly necessary.
@@ -37,41 +48,48 @@ async def pull_handler(message: dict, queue: asyncio.Queue):
     await queue.put(message)
 
 
-async def request_get(
+async def run_request(
     counter_party_protocol_url: str,
     counter_party_connector_id: str,
     asset_query: str,
     controller: ConnectorController,
     queue: asyncio.Queue,
-    queue_timeout_seconds: int = 30,
+    queue_timeout_seconds: int = 60,
 ):
-    """Demonstration of a GET request to the Mock HTTP API."""
+    """
+    Executes the full data request flow:
+    1. Negotiates contract terms with the provider
+    2. Initiates the data transfer
+    3. Waits for and processes the push message containing the data
+    """
 
+    # Start contract negotiation with the provider
     transfer_details = await controller.run_negotiation_flow(
         counter_party_protocol_url=counter_party_protocol_url,
         counter_party_connector_id=counter_party_connector_id,
         asset_query=asset_query,
     )
 
+    # sink_base_url, sink_path and sink_method are the details of our local Consumer Backend.
+    # Multiple path parameters can be added after the base path to be added to the routing key.
+    # This enables us to "group" the push messages depending on the path called by the provider.
+    sink_path = f"{_CONSUMER_BACKEND_PUSH_PATH}/specific/routing/key"
+
+    # Initiate the data transfer process
     transfer_process_id = await controller.run_transfer_flow(
-        transfer_details=transfer_details, is_provider_push=False
+        transfer_details=transfer_details,
+        is_provider_push=True,
+        sink_base_url=_CONSUMER_BACKEND_BASE_URL,
+        sink_path=sink_path,
+        sink_method=_CONSUMER_BACKEND_PUSH_METHOD,
     )
 
-    http_pull_msg = await asyncio.wait_for(queue.get(), timeout=queue_timeout_seconds)
+    _logger.info("Transfer process ID: %s", transfer_process_id)
 
-    if http_pull_msg.id != transfer_process_id:
-        raise RuntimeError(
-            "The ID of the Transfer Process does not match the ID of the HTTP Pull message"
-        )
+    # Wait for the push message containing the requested data
+    http_push_msg = await asyncio.wait_for(queue.get(), timeout=queue_timeout_seconds)
 
-    async with httpx.AsyncClient() as client:
-        _logger.info(
-            "Sending HTTP GET request with arguments:\n%s",
-            pprint.pformat(http_pull_msg.request_args),
-        )
-
-        resp = await client.request(**http_pull_msg.request_args)
-        _logger.info("Response:\n%s", pprint.pformat(resp.json()))
+    _logger.info("Received response:\n%s", pprint.pformat(http_push_msg.body))
 
 
 async def main(
@@ -79,19 +97,21 @@ async def main(
     counter_party_connector_id: str,
     asset_query: str,
 ):
-    queue: asyncio.Queue[HttpPullMessage] = asyncio.Queue()
+    """
+    Main entry point for the data request script.
+    Sets up message handling and executes the request flow.
+    """
 
-    async def pull_handler_partial(message: dict):
-        await pull_handler(message=message, queue=queue)
+    queue: asyncio.Queue[HttpPushMessage] = asyncio.Queue()
 
-    # Start RabbitMQ broker and configure handler for HTTP pull messages from Provider
-    # These messages (EndpointDataReference) are received by the Consumer Backend
-    # For details on why we need a consumer backend and message broker, see:
-    # https://github.com/fundacionctic/connector-building-blocks/blob/main/docs/faqs.md
-    async with with_messaging_app(http_pull_handler=pull_handler_partial):
+    async def push_handler_partial(message: dict):
+        await push_handler(message=message, queue=queue)
+
+    # Start RabbitMQ broker and configure handler for messages from Provider
+    async with with_messaging_app(http_push_handler=push_handler_partial):
         controller = ConnectorController()
 
-        await request_get(
+        await run_request(
             counter_party_protocol_url=counter_party_protocol_url,
             counter_party_connector_id=counter_party_connector_id,
             asset_query=asset_query,

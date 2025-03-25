@@ -23,8 +23,9 @@ services:
     networks:
       - omegax_datacellar_net
   datacellar-connector-backend:
-    image: agmangas/edc-connector:main
-    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     restart: on-failure
     volumes:
       - ${CERT_FOLDER_DATACELLAR}:/etc/connector/certs
