@@ -4,14 +4,16 @@ version: "3"
 
 vars:
   NETWORK_NAME: omegax-datacellar-net
-  CERT_FOLDER: "{{.ROOT_DIR}}/certs"
+  CERT_FOLDER_DATACELLAR: "{{.ROOT_DIR}}/certs-datacellar"
+  CERT_FOLDER_SOVITY: "{{.ROOT_DIR}}/certs-sovity"
   COMPOSE_PROJECT_NAME_OMEGAX: omegax-env
   COMPOSE_PROJECT_NAME_DATACELLAR: datacellar-env
   SCRIPT_IMAGE: omegax-datacellar-scripts
 
 env:
   NETWORK_NAME: "{{.NETWORK_NAME}}"
-  CERT_FOLDER: "{{.CERT_FOLDER}}"
+  CERT_FOLDER_DATACELLAR: "{{.CERT_FOLDER_DATACELLAR}}"
+  CERT_FOLDER_SOVITY: "{{.CERT_FOLDER_SOVITY}}"
 
 tasks:
   create-network:
@@ -20,6 +22,58 @@ tasks:
       - docker network create --driver bridge {{.NETWORK_NAME}}
     status:
       - docker network inspect {{.NETWORK_NAME}} >/dev/null 2>&1
+
+  generate-certs:
+    internal: true
+    vars:
+      CERT_FOLDER: "{{.CERT_FOLDER}}"
+      KEY_ALIAS: "{{.KEY_ALIAS}}"
+      KEY_PASSW: "{{.KEY_PASSW}}"
+    env:
+      OUT_DIR: "{{.CERT_FOLDER}}"
+      KEY_ALIAS: "{{.KEY_ALIAS}}"
+      KEY_PASSW: "{{.KEY_PASSW}}"
+    cmds:
+      - mkdir -p {{.CERT_FOLDER}}
+      - "{{.ROOT_DIR}}/create-certs.sh"
+
+  datacellar-certs:
+    desc: Generates certificates and keystore for the Data Cellar connector
+    cmds:
+      - task: generate-certs
+        vars:
+          CERT_FOLDER: "{{.CERT_FOLDER_DATACELLAR}}"
+          KEY_ALIAS: datacellar
+          KEY_PASSW: datacellar
+    status:
+      - test -f {{.CERT_FOLDER_DATACELLAR}}/*.pfx
+
+  sovity-certs:
+    desc: Generates certificates and keystore for the Sovity EDC connector
+    vars:
+      CERT_FOLDER: "{{.CERT_FOLDER_SOVITY}}"
+      KEY_ALIAS: omegax
+      KEY_PASSW: omegax
+      KEYSTORE_PATH: "{{.CERT_FOLDER}}/cert.pfx"
+      PUBKEY_ALIAS: OMEGAX_CERT_PEM
+      PRIVKEY_ALIAS: OMEGAX_PRIVKEY_PEM
+      DOTENV_NAME: .env.sovity-keys
+    env:
+      KEYSTORE_PATH: "{{.KEYSTORE_PATH}}"
+      KEYSTORE_PASSWORD: "{{.KEY_PASSW}}"
+      OUT_DIR: "{{.CERT_FOLDER}}"
+      PUBKEY_ALIAS: "{{.PUBKEY_ALIAS}}"
+      PRIVKEY_ALIAS: "{{.PRIVKEY_ALIAS}}"
+      DOTENV_NAME: "{{.DOTENV_NAME}}"
+    cmds:
+      - task: generate-certs
+        vars:
+          CERT_FOLDER: "{{.CERT_FOLDER}}"
+          KEY_ALIAS: "{{.KEY_ALIAS}}"
+          KEY_PASSW: "{{.KEY_PASSW}}"
+      - "{{.ROOT_DIR}}/export-keystore-to-dotenv.sh"
+    status:
+      - test -f {{.CERT_FOLDER_SOVITY}}/*.pfx
 
   # For further information see:
   # https://github.com/sovity/edc-ce/blob/v10.5.1/docs/deployment-guide/goals/local-demo/README.md
@@ -32,7 +86,10 @@ tasks:
         docker compose
         -p {{.COMPOSE_PROJECT_NAME_OMEGAX}}
         -f {{.ROOT_DIR}}/docker-compose-sovity.yml
+        --env-file {{.CERT_FOLDER_SOVITY}}/.env.sovity-keys
         up -d --wait
+    preconditions:
+      - test -f {{.CERT_FOLDER_SOVITY}}/.env.sovity-keys
 
   stop-sovity:
     desc: "Stop the local demo environment for the Sovity EDC connector"
@@ -42,18 +99,6 @@ tasks:
         -p {{.COMPOSE_PROJECT_NAME_OMEGAX}}
         -f {{.ROOT_DIR}}/docker-compose-sovity.yml  
         down -v
-
-  datacellar-certs:
-    desc: Generates certificates and keystore for the Data Cellar connector
-    env:
-      OUT_DIR: "{{.CERT_FOLDER}}"
-      KEY_ALIAS: datacellar
-      KEY_PASSW: datacellar
-    cmds:
-      - mkdir -p {{.CERT_FOLDER}}
-      - "{{.ROOT_DIR}}/create-certs.sh"
-    status:
-      - test -f {{.CERT_FOLDER}}/*.pfx
 
   deploy-datacellar:
     deps:
@@ -100,5 +145,7 @@ tasks:
         ignore_error: true
       - task: stop-sovity
       - task: stop-datacellar
-      - cmd: rm -fr {{.CERT_FOLDER}}
+      - cmd: rm -fr {{.CERT_FOLDER_DATACELLAR}}
+        ignore_error: true
+      - cmd: rm -fr {{.CERT_FOLDER_SOVITY}}
         ignore_error: true

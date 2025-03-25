@@ -16,7 +16,7 @@ services:
       - 44005:44005
     volumes:
       - ./datacellar-connector.properties:/etc/connector/connector.properties
-      - ${CERT_FOLDER}:/etc/connector/certs
+      - ${CERT_FOLDER_DATACELLAR}:/etc/connector/certs
     depends_on:
       datacellar-broker:
         condition: service_healthy
@@ -27,7 +27,7 @@ services:
     platform: linux/amd64
     restart: on-failure
     volumes:
-      - ${CERT_FOLDER}:/etc/connector/certs
+      - ${CERT_FOLDER_DATACELLAR}:/etc/connector/certs
     environment:
       EDC_RABBIT_URL: amqp://guest:guest@datacellar-broker:5672
       EDC_HTTP_API_PORT: 44080
