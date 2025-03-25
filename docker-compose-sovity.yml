@@ -128,8 +128,8 @@ services:
       sovity.micrometer.enabled: "true"
       edc.transfer.proxy.token.signer.privatekey.alias: "omegax"
       edc.transfer.proxy.token.verifier.publickey.alias: "publickey"
-      sovity.vault.in-memory.init.omegax: ${OMEGAX_PRIVKEY_PEM}
-      sovity.vault.in-memory.init.publickey: ${OMEGAX_CERT_PEM}
+      sovity.vault.in-memory.init.omegax: ${OMEGAX_PRIVKEY_JWK}
+      sovity.vault.in-memory.init.publickey: ${OMEGAX_CERT_JWK}
     volumes:
       - ${CERT_FOLDER_SOVITY}:/etc/connector/certs
     networks:

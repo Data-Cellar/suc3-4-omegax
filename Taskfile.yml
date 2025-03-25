@@ -55,8 +55,8 @@ tasks:
       KEY_ALIAS: omegax
       KEY_PASSW: omegax
       KEYSTORE_PATH: "{{.CERT_FOLDER}}/cert.pfx"
-      PUBKEY_ALIAS: OMEGAX_CERT_PEM
-      PRIVKEY_ALIAS: OMEGAX_PRIVKEY_PEM
+      PUBKEY_ALIAS: OMEGAX_CERT_JWK
+      PRIVKEY_ALIAS: OMEGAX_PRIVKEY_JWK
       DOTENV_NAME: .env.sovity-keys
     env:
       KEYSTORE_PATH: "{{.KEYSTORE_PATH}}"
@@ -75,8 +75,6 @@ tasks:
     status:
       - test -f {{.CERT_FOLDER_SOVITY}}/*.pfx
 
-  # For further information see:
-  # https://github.com/sovity/edc-ce/blob/v10.5.1/docs/deployment-guide/goals/local-demo/README.md
   deploy-sovity:
     deps:
       - create-network
